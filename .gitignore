@@ -1,0 +1,11 @@
+# Webstorm files
+.idea/
+
+# Node.js modules
+node_modules/
+
+# Input folder
+xmls/
+
+# Output folder
+output/
