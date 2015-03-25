@@ -1,3 +1,4 @@
+var io_socket = require('socket.io');
 var express = require('express');
 var router = express.Router();
 var fs = require('fs'),
@@ -10,14 +11,16 @@ var path = require('path');
 var sourcesFilesToBeDeleted = ["sources.txt", "sources-images.txt"];
 var programFilesToBeDeleted = ["programs.txt", "programs-cast.txt", "programs-image.txt", "programs-imageids.txt"];
 var schedulesFilesToBeDeleted = ["schedules.txt"];
-
+router.io = io_socket;
 var inputDirectoryPrefix = "xmls";
 var outputDirectoryPrefix = "output";
-var sourceParser = require('../parsers/sources')(sourcesSaxStream, outputDirectoryPrefix);
+var sourceParser = require('../parsers/sources')(sourcesSaxStream, outputDirectoryPrefix, router.io);
 //var programParser = require('../parsers/programs')(programsSaxStream, outputDirectoryPrefix);
-var programParser = require('../parsers/programs_obj')(programsSaxStream, outputDirectoryPrefix);
-var schedulesParser = require('../parsers/schedules')(schedulesSaxStream, outputDirectoryPrefix);
+//var programParser = require('../parsers/programs_obj')(programsSaxStream, outputDirectoryPrefix, router.io);
+var programParser = null;
+var schedulesParser = require('../parsers/schedules')(schedulesSaxStream, outputDirectoryPrefix, router.io);
 var filePurger = require('../utils/filePurger');
+
 
 /* GET home page. */
 router.get('/', function (req, res, next) {
@@ -32,6 +35,7 @@ router.get('/sources', function (req, res, next) {
     if (path.existsSync(filePath)) {
         fs.createReadStream(filePath)
             .pipe(sourceParser);
+
     }
     res.render('sources', {title: "Parsing the Sources XML"});
 
@@ -42,9 +46,13 @@ router.get('/programs', function (req, res, next) {
     console.time('programs parsing');
     //var filePath = path.join(inputDirectoryPrefix, "programs_trial.xml");
     var filePath = path.join(inputDirectoryPrefix, "programs.xml");
+    if (!programParser) {
+        programParser = require('../parsers/programs_obj')(programsSaxStream, outputDirectoryPrefix, router.io);
+    }
     if (path.existsSync(filePath)) {
         fs.createReadStream(filePath)
             .pipe(programParser);
+        router.io.sockets.emit('parsing start');
     }
     res.render('programs', {title: "Parsing the Programs XML"});
 

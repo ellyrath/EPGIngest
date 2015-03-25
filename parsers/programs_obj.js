@@ -1,8 +1,10 @@
 var os = require('os');
 var fileAppender = require('../utils/fileAppender');
 var _ = require('underscore');
+var io = require('../app');
 
-var programsParser = function (saxStream, outputDirectoryPrefix) {
+
+var programsParser = function (saxStream, outputDirectoryPrefix, io) {
     saxStream.on("error", function (e) {
         // unhandled errors will throw, since this is a proper node
         // event emitter.
@@ -168,6 +170,7 @@ var programsParser = function (saxStream, outputDirectoryPrefix) {
         currentTag = "";
     });
     saxStream.on("end", function (node) {
+        io.sockets.emit('parsing end');
         console.timeEnd("programs parsing");
         console.info(programCount + " programs processed.");
     });

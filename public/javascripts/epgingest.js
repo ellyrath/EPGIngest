@@ -15,6 +15,19 @@
         simulateError = state;
     }
 
+    var socket = io('http://localhost:3000');
+    socket.on('parsing start', function (data) {
+        //alert("Parsing started");
+        validation_bar.toggleClass('progress-bar-warning progress-bar-striped active progress-bar-success');
+        panelValidate.toggleClass('panel-default panel-success');
+        // Start parsing
+        parse_bar.css('width', '100%');
+        parse_bar.toggleClass('progress-bar-warning progress-bar-striped active');
+    });
+    socket.on('parsing end', function (data) {
+        parseXmlComplete();
+    });
+
     $("[name='simError']").bootstrapSwitch({'onSwitchChange': switchChange, 'onColor': 'danger'});
 
     function stop_progress() {
@@ -52,12 +65,15 @@
 
     function validateXmlComplete() {
         if (!simulateError) {
-            validation_bar.toggleClass('progress-bar-warning progress-bar-striped active progress-bar-success');
-            panelValidate.toggleClass('panel-default panel-success');
-            // Start parsing
-            parse_bar.css('width', '100%');
-            parse_bar.toggleClass('progress-bar-warning progress-bar-striped active');
-            setTimeout(parseXmlComplete, 10000);
+            //validation_bar.toggleClass('progress-bar-warning progress-bar-striped active progress-bar-success');
+            //panelValidate.toggleClass('panel-default panel-success');
+            //// Start parsing
+            //parse_bar.css('width', '100%');
+            //parse_bar.toggleClass('progress-bar-warning progress-bar-striped active');
+            //setTimeout(parseXmlComplete, 10000);
+            $.ajax({
+                'url': '/programs'
+            });
         } else {
             validation_bar.toggleClass('progress-bar-warning progress-bar-striped active progress-bar-danger');
             panelValidate.toggleClass('panel-default panel-danger');
