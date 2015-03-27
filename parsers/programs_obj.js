@@ -45,29 +45,34 @@ var programsParser = function (saxStream, outputDirectoryPrefix, io) {
     };
     var programCast = {};
     _.extend(programCast, programCastTemplate);
-    var imageRecordTemplate = {
-        'TMSId': '',
-        'width': '',
-        'height': '',
-        'type': '',
-        'URI': ''
-    };
-    var imageRecord = {};
-    _.extend(imageRecord, imageRecordTemplate);
+    var imageRecord = null;
     var currentTag = "";
     var tmsId = "";
     var seriesId = "";
     var hasTitleBeenPushed = false;
     var hasDescBeenPushed = true;
     var hasRatingBeenPushed = false;
-    var hasImageBeenPushed = true;
-    var useImage = false;
     var isEpisode = false;
     var isCast = false;
     var programCount = 0;
+    var verticalImages = [];
+    var horizontalImages = [];
     var cleanUp = function (item) {
         return item && item.indexOf('\n') == -1 && item.indexOf('\r') == -1 && item.indexOf('\t') == -1
-    }
+    };
+    var getProgramImage = function (TMSId, width, height, type, url, orientation) {
+        return {
+            'sourceId': TMSId,
+            'width': width,
+            'height': height,
+            'type': type,
+            'url': url,
+            'orientation': orientation
+        }
+    };
+    var largestImage = function (programImage) {
+        return programImage['width'] * programImage['height'];
+    };
 
     saxStream.on("opentag", function (node) {
 
@@ -82,9 +87,10 @@ var programsParser = function (saxStream, outputDirectoryPrefix, io) {
             seriesId = node.attributes['seriesId'];
             hasTitleBeenPushed = false;
             hasDescBeenPushed = true;
-            hasImageBeenPushed = false;
             hasRatingBeenPushed = false;
             programCount++;
+            verticalImages = [];
+            horizontalImages = [];
         }
         if (node.name === 'episodeInfo') {
             isEpisode = true;
@@ -104,13 +110,10 @@ var programsParser = function (saxStream, outputDirectoryPrefix, io) {
             programCast['personId'] = node.attributes['personId'];
             programCast['ord'] = node.attributes['ord'];
         }
-        if (node.name === 'asset' && !hasImageBeenPushed && node.attributes['type'].indexOf('image') != -1 && node.attributes['action'] !== 'delete') {
+        if (node.name === 'asset' && node.attributes['type'].indexOf('image') != -1 && node.attributes['action'] !== 'delete') {
             //imageRecord.push(node.attributes['assetId']);
-            imageRecord['TMSId'] = tmsId;
-            imageRecord['width'] = node.attributes['width'];
-            imageRecord['height'] = node.attributes['height'];
-            imageRecord['type'] = node.attributes['type'].replace(/image\//g, '');
-            useImage = true;
+            imageRecord = new getProgramImage(tmsId, node.attributes['width'], node.attributes['height'], node.attributes['type'].replace(/image\//g, ''));
+            imageRecord['orientation'] = imageRecord['height'] > imageRecord['width'] ? 'V' : 'H';
         }
         currentTag = node.name;
     });
@@ -138,7 +141,6 @@ var programsParser = function (saxStream, outputDirectoryPrefix, io) {
             _.extend(programRecord, programRecordTemplate);
             programRecord['genre'] = [];
             _.extend(programCast, programCastTemplate);
-            _.extend(imageRecord, imageRecordTemplate);
             tmsId = "";
             seriesId = "";
         }
@@ -158,14 +160,26 @@ var programsParser = function (saxStream, outputDirectoryPrefix, io) {
             fileAppender(outputDirectoryPrefix, 'programs-cast.txt', _.values(programCast).join(fieldSeparator) + os.EOL);
             programCast = {"TMSId": tmsId};
         }
-        if (node === 'asset' && useImage) {
-            useImage = false;
-        }
-        if (node === 'URI' && !hasImageBeenPushed) {
-            fileAppender(outputDirectoryPrefix, 'programs-image.txt', _.values(imageRecord).join(fieldSeparator) + os.EOL);
+        if (node === 'assets') {
+            if (!_.isEmpty(horizontalImages)) {
+                fileAppender(outputDirectoryPrefix, 'programs-image.txt', _.values(_.max(horizontalImages, largestImage)).join(fieldSeparator) + os.EOL);
+            } else {
+                var dummyHorizontalImage = new getProgramImage(tmsId);
+                dummyHorizontalImage['orientation'] = 'H';
+                fileAppender(outputDirectoryPrefix, 'programs-image.txt', _.values(dummyHorizontalImage).join(fieldSeparator) + os.EOL);
+                dummyHorizontalImage = null;
+            }
+            if (!_.isEmpty(verticalImages)) {
+                fileAppender(outputDirectoryPrefix, 'programs-image.txt', _.values(_.max(verticalImages, largestImage)).join(fieldSeparator) + os.EOL);
+            } else {
+                var dummyVerticalImage = new getProgramImage(tmsId);
+                dummyVerticalImage['orientation'] = 'V';
+                fileAppender(outputDirectoryPrefix, 'programs-image.txt', _.values(dummyVerticalImage).join(fieldSeparator) + os.EOL);
+                dummyVerticalImage = null;
+            }
             //fileAppender(outputDirectoryPrefix, 'programs-imageids.txt', [tmsId, seriesId, imageRecord[0]].join(fieldSeparator) + os.EOL);
-            hasImageBeenPushed = true;
-            imageRecord = {'TMSId': tmsId};
+            verticalImages = [];
+            horizontalImages = [];
         }
         currentTag = "";
     });
@@ -194,8 +208,17 @@ var programsParser = function (saxStream, outputDirectoryPrefix, io) {
                 programCast['name'] = programCast['first'] + " " + text;
             }
         }
-        if (validImageTags.indexOf(this._parser.tagName) != -1 && !hasImageBeenPushed && useImage) {
-            imageRecord[this._parser.tagName] = 'http://demo.tmsimg.com/' + text;
+        if (validImageTags.indexOf(this._parser.tagName) != -1) {
+            if(!imageRecord) {
+                return;
+            }
+            imageRecord['url'] = 'http://demo.tmsimg.com/' + text;
+            if (imageRecord['orientation'] === 'V') {
+                verticalImages.push(imageRecord);
+            } else {
+                horizontalImages.push(imageRecord);
+            }
+            imageRecord = null;
         }
     });
     return saxStream;
