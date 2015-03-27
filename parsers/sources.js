@@ -1,5 +1,6 @@
 var os = require('os');
 var fileAppender = require('../utils/fileAppender');
+var _ = require('underscore');
 
 var sourcesParser = function (saxStream, outputDirectoryPrefix) {
     saxStream.on("error", function (e) {
@@ -13,27 +14,32 @@ var sourcesParser = function (saxStream, outputDirectoryPrefix) {
     var validTags = ["name", "type", "timeZone", "callSign"];
     var fieldSeparator = "|";
     var sourceRecord = [];
-    var sourceImage = [];
+    var sourceImages = [];
+    var getSourceImage = function (sourceId, width, height, type, url) {
+        return {
+            'sourceId': sourceId,
+            'width': width,
+            'height': height,
+            'type': type,
+            'url': url
+        }
+    };
+    var currentSourceImage = null;
+    var largestImage = function (sourceImage) {
+        return sourceImage['width'] * sourceImage['height'];
+    }
     var currentTag = "";
     var prgSvcId = "";
     var sourceId = "";
-    var hasImageBeenPushed = true;
-    var useImage = false;
 
     saxStream.on("opentag", function (node) {
         if (node.name === 'prgSvc') {
             sourceRecord.push(node.attributes['sourceId']);
             prgSvcId = node.attributes['prgSvcId'];
             sourceId = node.attributes['sourceId'];
-            hasImageBeenPushed = false;
-            useImage = false;
         }
-        if (node.name === 'image' && !hasImageBeenPushed && node.attributes['primary'] === 'true') {
-            sourceImage.push(sourceId);
-            sourceImage.push(node.attributes['width']);
-            sourceImage.push(node.attributes['height']);
-            sourceImage.push(node.attributes['type'].replace(/image\//g, ''));
-            useImage = true;
+        if (node.name === 'image') {
+            currentSourceImage = new getSourceImage(sourceId, node.attributes['width'], node.attributes['height'], node.attributes['type'].replace(/image\//g, ''));
         }
         currentTag = node.name;
     });
@@ -44,17 +50,13 @@ var sourcesParser = function (saxStream, outputDirectoryPrefix) {
         if (node === 'prgSvc') {
             fileAppender(outputDirectoryPrefix, 'sources.txt', sourceRecord.join(fieldSeparator) + os.EOL);
             sourceRecord = [];
-            sourceImage = [];
+            sourceImages = [];
             prgSvcId = "";
             sourceId = "";
         }
-        if(node === 'image' && useImage) {
-            useImage = false;
-        }
-        if (node === 'URI' && sourceImage.length) {
-            fileAppender(outputDirectoryPrefix, 'sources-images.txt', sourceImage.join(fieldSeparator) + os.EOL);
-            hasImageBeenPushed = true;
-            sourceImage = [];
+        if (node === 'images' && !_.isEmpty(sourceImages)) {
+            fileAppender(outputDirectoryPrefix, 'sources-images.txt', _.values(_.max(sourceImages, largestImage)).join(fieldSeparator) + os.EOL);
+            sourceImages = [];
         }
         currentTag = "";
     });
@@ -65,8 +67,10 @@ var sourcesParser = function (saxStream, outputDirectoryPrefix) {
         if (validTags.indexOf(currentTag) != -1) {
             sourceRecord.push(text);
         }
-        if (currentTag === "URI" && !hasImageBeenPushed && useImage) {
-            sourceImage.push('http://demo.tmsimg.com/' + text);
+        if (currentTag === "URI") {
+            currentSourceImage['url'] = 'http://demo.tmsimg.com/' + text;
+            sourceImages.push(currentSourceImage);
+            currentSourceImage = null;
         }
     });
     return saxStream;
