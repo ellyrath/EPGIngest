@@ -87,5 +87,5 @@
 
     validation_btn_stop.click(stop_progress);
     validation_btn_re.click(start_progress);
-    setTimeout(downloadFilesComplete, 5000);
+    //setTimeout(downloadFilesComplete, 5000);
 })($);
