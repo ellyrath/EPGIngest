@@ -27,7 +27,7 @@ var sourcesParser = function (saxStream, outputDirectoryPrefix) {
     var currentSourceImage = null;
     var largestImage = function (sourceImage) {
         return sourceImage['width'] * sourceImage['height'];
-    }
+    };
     var currentTag = "";
     var prgSvcId = "";
     var sourceId = "";
