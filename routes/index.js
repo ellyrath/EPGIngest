@@ -24,7 +24,7 @@ var filePurger = require('../utils/filePurger');
 
 /* GET home page. */
 router.get('/', function (req, res, next) {
-    res.render('index', {title: "Welcome to the EPG Injest XML Parser"});
+    res.render('index', {title: "EPG Ingest Pipeline"});
 });
 router.get('/sources', function (req, res, next) {
     //Remove any existing files
