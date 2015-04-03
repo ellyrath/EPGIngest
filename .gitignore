@@ -9,3 +9,5 @@ xmls/
 
 # Output folder
 output/
+
+*.bak
