@@ -12,7 +12,7 @@ var sourcesFilesToBeDeleted = ["sources.txt", "sources-images.txt"];
 var programFilesToBeDeleted = ["programs.txt", "programs-cast.txt", "programs-image.txt", "programs-imageids.txt"];
 var schedulesFilesToBeDeleted = ["schedules.txt"];
 router.io = io_socket;
-var inputDirectoryPrefix = "xmls";
+var inputDirectoryPrefix = "../xmls";
 var outputDirectoryPrefix = "output";
 var sourceParser = require('../parsers/sources')(sourcesSaxStream, outputDirectoryPrefix, router.io);
 //var programParser = require('../parsers/programs')(programsSaxStream, outputDirectoryPrefix);
@@ -20,6 +20,7 @@ var sourceParser = require('../parsers/sources')(sourcesSaxStream, outputDirecto
 var programParser = null;
 var schedulesParser = require('../parsers/schedules')(schedulesSaxStream, outputDirectoryPrefix, router.io);
 var filePurger = require('../utils/filePurger');
+var dirString = path.dirname(fs.realpathSync(__filename));
 
 
 /* GET home page. */
@@ -30,9 +31,10 @@ router.get('/sources', function (req, res, next) {
     //Remove any existing files
     filePurger(outputDirectoryPrefix, sourcesFilesToBeDeleted);
     console.time('sources parsing');
-
-    var filePath = path.join(inputDirectoryPrefix, "sources.xml");
-    if (path.existsSync(filePath)) {
+    var filePath = path.join(dirString,inputDirectoryPrefix, "sources.xml");
+   console.log('directory to start walking...', dirString);
+    console.info('filePath'+ filePath);
+if (fs.existsSync(filePath)) {
         fs.createReadStream(filePath)
             .pipe(sourceParser);
 
@@ -44,12 +46,11 @@ router.get('/programs', function (req, res, next) {
     //Remove any existing files
     filePurger(outputDirectoryPrefix, programFilesToBeDeleted);
     console.time('programs parsing');
-    //var filePath = path.join(inputDirectoryPrefix, "programs_trial.xml");
-    var filePath = path.join(inputDirectoryPrefix, "programs.xml");
+    var filePath = path.join(dirString,inputDirectoryPrefix, "programs.xml");
     if (!programParser) {
         programParser = require('../parsers/programs_obj')(programsSaxStream, outputDirectoryPrefix, router.io);
     }
-    if (path.existsSync(filePath)) {
+    if (fs.existsSync(filePath)) {
         fs.createReadStream(filePath)
             .pipe(programParser);
         router.io.sockets.emit('parsing start');
@@ -61,8 +62,8 @@ router.get('/schedules', function (req, res, next) {
     //Remove any existing files
     filePurger(outputDirectoryPrefix, schedulesFilesToBeDeleted);
     console.time('schedules parsing');
-    var filePath = path.join(inputDirectoryPrefix, "schedules.xml");
-    //if (path.existsSync(filePath)) {
+    var filePath = path.join(dirString,inputDirectoryPrefix, "schedules.xml");
+    //if (fs.existsSync(filePath)) {
     fs.createReadStream(filePath)
         .pipe(schedulesParser);
     //}

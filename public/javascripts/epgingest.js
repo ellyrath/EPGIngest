@@ -65,15 +65,16 @@
 
     function validateXmlComplete() {
         if (!simulateError) {
-            //validation_bar.toggleClass('progress-bar-warning progress-bar-striped active progress-bar-success');
-            //panelValidate.toggleClass('panel-default panel-success');
-            //// Start parsing
-            //parse_bar.css('width', '100%');
-            //parse_bar.toggleClass('progress-bar-warning progress-bar-striped active');
-            //setTimeout(parseXmlComplete, 10000);
-            $.ajax({
-                'url': '/programs'
-            });
+            validation_bar.toggleClass('progress-bar-warning progress-bar-striped active progress-bar-success');
+            panelValidate.toggleClass('panel-default panel-success');
+            // Start parsing
+            parse_bar.css('width', '100%');
+            parse_bar.toggleClass('progress-bar-warning progress-bar-striped active');
+            setTimeout(parseXmlComplete, 10000);
+            /* Start the actual parsing*/
+            //$.ajax({
+            //    'url': '/programs'
+            //});
         } else {
             validation_bar.toggleClass('progress-bar-warning progress-bar-striped active progress-bar-danger');
             panelValidate.toggleClass('panel-default panel-danger');
@@ -87,5 +88,5 @@
 
     validation_btn_stop.click(stop_progress);
     validation_btn_re.click(start_progress);
-    //setTimeout(downloadFilesComplete, 5000);
+    setTimeout(downloadFilesComplete, 5000);
 })($);
