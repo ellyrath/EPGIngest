@@ -47,6 +47,7 @@ router.get('/programs', function (req, res, next) {
     filePurger(outputDirectoryPrefix, programFilesToBeDeleted);
     console.time('programs parsing');
     var filePath = path.join(dirString,inputDirectoryPrefix, "programs.xml");
+   // var filePath = path.join(dirString,inputDirectoryPrefix, "programs_sample.xml");
     if (!programParser) {
         programParser = require('../parsers/programs_obj')(programsSaxStream, outputDirectoryPrefix, router.io);
     }

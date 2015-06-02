@@ -55,25 +55,211 @@ var programsParser = function (saxStream, outputDirectoryPrefix, io) {
     var isEpisode = false;
     var isCast = false;
     var programCount = 0;
-    var verticalImages = [];
-    var horizontalImages = [];
+    var programImages = [];
+    var coverImageSelectionPreference = ["120x180", "240x360", "480x720", "960x1440", "135x180", "270x360", "540x720", "1080x1440"];
+    var sceneImageSelectionPreference = {
+        "16x9": ["240x135", "480x270", "960x540", "1280x720", "1920x1080"],
+        "4x3": ["180x135", "360x270", "720x540", "1440x1080"],
+        "all": ["240x135", "480x270", "960x540", "1280x720", "1920x1080", "180x135", "360x270", "720x540", "1440x1080"]
+    };
+    var detailImageSelectionPreference = {
+        "2x3": ["120x180", "240x360", "480x720", "960x1440"],
+        "3x4": ["135x180", "270x360", "540x720", "1080x1440"]
+    };
     var cleanUp = function (item) {
         return item && item.indexOf('\n') == -1 && item.indexOf('\r') == -1 && item.indexOf('\t') == -1
     };
-    var getProgramImage = function (TMSId, width, height, type, url, orientation) {
+    var getProgramImage = function (TMSId, width, height, type, url, tier, category, orientation) {
         return {
             'sourceId': TMSId,
             'width': width,
             'height': height,
             'type': type,
             'url': url,
+            'tier': tier,
+            'category': category,
             'orientation': orientation
         }
     };
-    var largestImage = function (programImage) {
-        return programImage['width'] * programImage['height'];
+    var imageSelectionLogic = function (image) {
+        return image['width'] + 'x' + image['height'];
+    };
+    var getAcceptableEpisodeImages = function (imageList) {
+        return _(imageList).filter(function (pi) {
+            return pi['tier'].toLowerCase() == 'episode';
+        });
+    };
+    var getAcceptableSeasonImages = function (imageList) {
+        return _(imageList).filter(function (pi) {
+            return pi['tier'].toLowerCase() == 'season';
+        });
+    };
+    var getAcceptableSeriesImages = function (imageList) {
+        return _(imageList).filter(function (pi) {
+            return pi['tier'].toLowerCase() == 'series';
+        });
+    };
+    var getCoverImage = function (programImages) {
+        if (!programImages || !programImages.length) {
+            return null;
+        }
+        var coverImagePreferenceFunction = function (img) {
+            for (var i = 0; i < coverImageSelectionPreference.length; i++) {
+                if (img['category'].toLowerCase().indexOf('banner') != -1 && imageSelectionLogic(img) == coverImageSelectionPreference[i]) {
+                    return true;
+                }
+            }
+            return false;
+        };
+        var acceptableResImages = _(programImages).filter(function (pi) {
+            return coverImageSelectionPreference.indexOf(imageSelectionLogic(pi)) != -1;
+        });
+        var coverImage = _(getAcceptableEpisodeImages(acceptableResImages)).find(coverImagePreferenceFunction);
+        if (!coverImage) {
+            coverImage = _(getAcceptableSeasonImages(acceptableResImages)).find(coverImagePreferenceFunction);
+        }
+        if (!coverImage) {
+            coverImage = _(getAcceptableSeriesImages(acceptableResImages)).find(coverImagePreferenceFunction);
+        }
+        return coverImage;
     };
 
+    var getSceneImage = function (programImages) {
+        if (!programImages || !programImages.length) {
+            return null;
+        }
+        var acceptableResImages = _(programImages).filter(function (pi) {
+            return sceneImageSelectionPreference['16x9'].indexOf(imageSelectionLogic(pi)) != -1;
+        });
+        var res16x9Selector = function (imageList) {
+            if(!imageList || !imageList.length) {
+                return null;
+            }
+            for (var ai in imageList) {
+                if (imageList[ai]['category'].toLowerCase().indexOf('banner') != -1) {
+                    return imageList[ai];
+                }
+                if (imageList[ai]['category'].toLowerCase().indexOf('episodic') != -1) {
+                    return imageList[ai];
+                }
+                if (imageList[ai]['category'].toLowerCase().indexOf('iconic') != -1) {
+                    return imageList[ai];
+                }
+                if (imageList[ai]['category'].toLowerCase().indexOf('cast ensemble') != -1) {
+                    return imageList[ai];
+                }
+            }
+            return null;
+        };
+        var res4x3Selector = function (imageList) {
+            if(!imageList || !imageList.length) {
+                return null;
+            }
+            for (var ai in imageList) {
+                if (imageList[ai]['category'].toLowerCase().indexOf('banner') != -1) {
+                    return imageList[ai];
+                }
+                if (imageList[ai]['category'].toLowerCase().indexOf('logo') != -1) {
+                    return imageList[ai];
+                }
+                if (imageList[ai]['category'].toLowerCase().indexOf('episodic') != -1) {
+                    return imageList[ai];
+                }
+                if (imageList[ai]['category'].toLowerCase().indexOf('iconic') != -1) {
+                    return imageList[ai];
+                }
+                if (imageList[ai]['category'].toLowerCase().indexOf('cast ensemble') != -1) {
+                    return imageList[ai];
+                }
+            }
+            return null;
+        };
+
+        //Look for banner, followed by episodic, followed by iconic, followed by ensemble images in 16X9 episode images
+        var sceneImage = res16x9Selector(getAcceptableEpisodeImages(acceptableResImages));
+        if (!sceneImage) {
+            sceneImage = res16x9Selector(getAcceptableSeasonImages(acceptableResImages));
+        }
+        if (!sceneImage) {
+            sceneImage = res16x9Selector(getAcceptableSeriesImages(acceptableResImages));
+        }
+        // Repeat the above for 4x3 images
+        if (!sceneImage) {
+            acceptableResImages = _(programImages).filter(function (pi) {
+                return sceneImageSelectionPreference['4x3'].indexOf(imageSelectionLogic(pi)) != -1;
+            });
+            sceneImage = res4x3Selector(getAcceptableEpisodeImages(acceptableResImages));
+        }
+        if (!sceneImage) {
+            sceneImage = res4x3Selector(getAcceptableSeasonImages(acceptableResImages));
+        }
+        if (!sceneImage) {
+            sceneImage = res4x3Selector(getAcceptableSeriesImages(acceptableResImages));
+        }
+        return sceneImage;
+    };
+
+    var getDetailsImage = function (programImages) {
+        if (!programImages || !programImages.length) {
+            return null;
+        }
+        var acceptableResImages = _(programImages).filter(function (pi) {
+            return detailImageSelectionPreference['2x3'].indexOf(imageSelectionLogic(pi)) != -1;
+        });
+        var res2x3Selector = function (imageList) {
+            if(!imageList || !imageList.length) {
+                return null;
+            }
+            for (var ai in imageList) {
+                if (imageList[ai]['category'].toLowerCase().indexOf('banner') != -1) {
+                    return imageList[ai];
+                }
+                if (imageList[ai]['category'].toLowerCase().indexOf('iconic') != -1) {
+                    return imageList[ai];
+                }
+            }
+            return null;
+        };
+        var res3x4Selector = function (imageList) {
+            if(!imageList || !imageList.length) {
+                return null;
+            }
+            for (var ai in imageList) {
+                if (imageList[ai]['category'].toLowerCase().indexOf('banner') != -1) {
+                    return imageList[ai];
+                }
+                if (imageList[ai]['category'].toLowerCase().indexOf('iconic') != -1) {
+                    return imageList[ai];
+                }
+                if (imageList[ai]['category'].toLowerCase().indexOf('cast in character') != -1) {
+                    return imageList[ai];
+                }
+            }
+            return null;
+        };
+        //Look for banner, followed by iconic images in 2X3 episode images
+        var detailsImage = res2x3Selector(getAcceptableEpisodeImages(acceptableResImages));
+        if (!detailsImage) {
+            detailsImage = res2x3Selector(getAcceptableSeasonImages(acceptableResImages));
+        }
+        if (!detailsImage) {
+            detailsImage = res2x3Selector(getAcceptableSeriesImages(acceptableResImages));
+        }
+        // Repeat the above for 3x4 images
+        if (!detailsImage) {
+            acceptableResImages = _(programImages).filter(function (pi) {
+                return detailImageSelectionPreference['3x4'].indexOf(imageSelectionLogic(pi)) != -1;
+            });
+            detailsImage = res3x4Selector(getAcceptableEpisodeImages(acceptableResImages));
+        }
+        if (!detailsImage) {
+            detailsImage = res3x4Selector(getAcceptableSeasonImages(acceptableResImages));
+        }
+        if (!detailsImage) {
+            detailsImage = res3x4Selector(getAcceptableSeriesImages(acceptableResImages));
+        }
+        return detailsImage;
+    };
     saxStream.on("opentag", function (node) {
 
         if (node.name === 'program') {
@@ -111,9 +297,7 @@ var programsParser = function (saxStream, outputDirectoryPrefix, io) {
             programCast['ord'] = node.attributes['ord'];
         }
         if (node.name === 'asset' && node.attributes['type'].indexOf('image') != -1 && node.attributes['action'] !== 'delete') {
-            //imageRecord.push(node.attributes['assetId']);
-            imageRecord = new getProgramImage(tmsId, node.attributes['width'], node.attributes['height'], node.attributes['type'].replace(/image\//g, ''));
-            imageRecord['orientation'] = imageRecord['height'] > imageRecord['width'] ? 'V' : 'H';
+            imageRecord = new getProgramImage(tmsId, node.attributes['width'], node.attributes['height'], node.attributes['type'].replace(/image\//g, ''), null, node.attributes['tier'], node.attributes['category'], null);
         }
         currentTag = node.name;
     });
@@ -161,25 +345,21 @@ var programsParser = function (saxStream, outputDirectoryPrefix, io) {
             programCast = {"TMSId": tmsId};
         }
         if (node === 'assets') {
-            if (!_.isEmpty(horizontalImages)) {
-                fileAppender(outputDirectoryPrefix, 'programs-image.txt', _.values(_.max(horizontalImages, largestImage)).join(fieldSeparator) + os.EOL);
-            } else {
-                var dummyHorizontalImage = new getProgramImage(tmsId);
-                dummyHorizontalImage['orientation'] = 'H';
-                fileAppender(outputDirectoryPrefix, 'programs-image.txt', _.values(dummyHorizontalImage).join(fieldSeparator) + os.EOL);
-                dummyHorizontalImage = null;
+            if (!_.isEmpty(programImages)) {
+                var coverImage = getCoverImage(programImages);
+                if (coverImage) {
+                    fileAppender(outputDirectoryPrefix, 'programs-image.txt', _.values(coverImage).join(fieldSeparator) + os.EOL);
+                }
+                var sceneImage = getSceneImage(programImages);
+                if (sceneImage) {
+                    fileAppender(outputDirectoryPrefix, 'programs-image.txt', _.values(sceneImage).join(fieldSeparator) + os.EOL);
+                }
+                var detailsImage = getDetailsImage(programImages);
+                if (detailsImage) {
+                    fileAppender(outputDirectoryPrefix, 'programs-image.txt', _.values(detailsImage).join(fieldSeparator) + os.EOL);
+                }
             }
-            if (!_.isEmpty(verticalImages)) {
-                fileAppender(outputDirectoryPrefix, 'programs-image.txt', _.values(_.max(verticalImages, largestImage)).join(fieldSeparator) + os.EOL);
-            } else {
-                var dummyVerticalImage = new getProgramImage(tmsId);
-                dummyVerticalImage['orientation'] = 'V';
-                fileAppender(outputDirectoryPrefix, 'programs-image.txt', _.values(dummyVerticalImage).join(fieldSeparator) + os.EOL);
-                dummyVerticalImage = null;
-            }
-            //fileAppender(outputDirectoryPrefix, 'programs-imageids.txt', [tmsId, seriesId, imageRecord[0]].join(fieldSeparator) + os.EOL);
-            verticalImages = [];
-            horizontalImages = [];
+            programImages = [];
         }
         currentTag = "";
     });
@@ -209,15 +389,11 @@ var programsParser = function (saxStream, outputDirectoryPrefix, io) {
             }
         }
         if (validImageTags.indexOf(this._parser.tagName) != -1) {
-            if(!imageRecord) {
+            if (!imageRecord) {
                 return;
             }
             imageRecord['url'] = 'http://demo.tmsimg.com/' + text;
-            if (imageRecord['orientation'] === 'V') {
-                verticalImages.push(imageRecord);
-            } else {
-                horizontalImages.push(imageRecord);
-            }
+            programImages.push(imageRecord);
             imageRecord = null;
         }
     });

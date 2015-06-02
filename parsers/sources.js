@@ -1,6 +1,9 @@
 var os = require('os');
 var fileAppender = require('../utils/fileAppender');
 var _ = require('underscore');
+var util = require("util");
+
+
 
 var sourcesParser = function (saxStream, outputDirectoryPrefix) {
     saxStream.on("error", function (e) {
@@ -11,13 +14,57 @@ var sourcesParser = function (saxStream, outputDirectoryPrefix) {
         this._parser.error = null
         this._parser.resume()
     });
-    var validTags = ["name", "type", "timeZone", "callSign"];
+
+    var sourceTemplate = {
+        'STATION_NUM': '',
+        'STATION_NAME': '',
+        'STATION_CALL_SIGN': '',
+        'STATION_TIME_ZONE': '',
+        'STATION_AFFIL': "",
+        'STATION_CITY': "",
+        'STATION_STATE': "",
+        'STATION_COUNTRY': "",
+        'FCC_CHANNEL_NUM': "",
+        'sourceImageStore':{}
+    };
+
+    var sourceImageTemplate = {
+        'width': '',
+        'height': '',
+        'type': '',
+        'url': ''
+    };
+
+    var print = function(o){
+        var str='';
+        for (var p in o) {
+                 if (p === 'sourceImageStore' )
+                {
+                    str += print(o[p])+ fieldSeparator;
+                }
+                else
+                str += o[p] + fieldSeparator;
+            }
+        return str;
+    }
+    var printHeader = function(o){
+        var str='';
+        for(var p in o){
+            str+= p + fieldSeparator;
+        }
+        return str;
+    }
+    var sourceRecord = {};
+    _.extend(sourceRecord, sourceTemplate);
+
+
+
+    var validTags = ["name", "type", "timeZone", "callSign","num"];
     var fieldSeparator = "|";
-    var sourceRecord = [];
+    //var sourceRecord = [];
     var sourceImages = [];
-    var getSourceImage = function (sourceId, width, height, type, url) {
+    var getSourceImage = function ( width, height, type, url) {
         return {
-            'sourceId': sourceId,
             'width': width,
             'height': height,
             'type': type,
@@ -32,14 +79,20 @@ var sourcesParser = function (saxStream, outputDirectoryPrefix) {
     var prgSvcId = "";
     var sourceId = "";
 
+
     saxStream.on("opentag", function (node) {
+        if (node.name === 'on'){
+            // Write header
+            fileAppender(outputDirectoryPrefix, 'sources.txt', printHeader(sourceTemplate) + os.EOL);
+        }
         if (node.name === 'prgSvc') {
-            sourceRecord.push(node.attributes['sourceId']);
-            prgSvcId = node.attributes['prgSvcId'];
-            sourceId = node.attributes['sourceId'];
+            sourceRecord['STATION_NUM'] = node.attributes['prgSvcId'];
+          //  sourceRecord.push(node.attributes['prgSvcId']);
+          //  prgSvcId = node.attributes['prgSvcId'];
+            //sourceId = node.attributes['sourceId'];
         }
         if (node.name === 'image') {
-            currentSourceImage = new getSourceImage(sourceId, node.attributes['width'], node.attributes['height'], node.attributes['type'].replace(/image\//g, ''));
+            currentSourceImage = new getSourceImage( node.attributes['width'], node.attributes['height'], node.attributes['type'].replace(/image\//g, ''));
         }
         currentTag = node.name;
     });
@@ -48,14 +101,28 @@ var sourcesParser = function (saxStream, outputDirectoryPrefix) {
     });
     saxStream.on("closetag", function (node) {
         if (node === 'prgSvc') {
-            fileAppender(outputDirectoryPrefix, 'sources.txt', sourceRecord.join(fieldSeparator) + os.EOL);
-            sourceRecord = [];
+         //   fileAppender(outputDirectoryPrefix, 'sources.txt', sourceRecord.join(fieldSeparator) + os.EOL);
+           if ( _.size(sourceRecord['sourceImageStore']) === 0)
+            {
+                _.extend(sourceImageTemplate, sourceImageMax);
+                sourceRecord['sourceImageStore'] = sourceImageTemplate;
+                sourceImageTemplate=[];
+            }
+            fileAppender(outputDirectoryPrefix, 'sources.txt', print(sourceRecord) + os.EOL);
+            sourceRecord['sourceImageStore']=[];
+                sourceRecord = [];
             sourceImages = [];
             prgSvcId = "";
             sourceId = "";
+            _.extend(sourceRecord, sourceTemplate);
         }
         if (node === 'images' && !_.isEmpty(sourceImages)) {
-            fileAppender(outputDirectoryPrefix, 'sources-images.txt', _.values(_.max(sourceImages, largestImage)).join(fieldSeparator) + os.EOL);
+            //fileAppender(outputDirectoryPrefix, 'sources-images.txt', _.values(_.max(sourceImages, largestImage)).join(fieldSeparator) + os.EOL);
+            //sourceRecord.push(_.values(_.max(sourceImages, largestImage)).join(fieldSeparator));
+            var sourceImageMax = (_.max(sourceImages, largestImage));
+            _.extend(sourceImageTemplate,sourceImageMax) ;
+              sourceRecord['sourceImageStore']=  sourceImageTemplate ;
+            console.log(sourceRecord['sourceImageStore']);
             sourceImages = [];
         }
         currentTag = "";
@@ -65,7 +132,21 @@ var sourcesParser = function (saxStream, outputDirectoryPrefix) {
     });
     saxStream.on("text", function (text) {
         if (validTags.indexOf(currentTag) != -1) {
-            sourceRecord.push(text);
+            if (currentTag == 'name')
+                sourceRecord['STATION_NAME']=text;
+            if (currentTag == 'timeZone')
+                sourceRecord['STATION_TIME_ZONE']=text;
+            if (currentTag == 'callSign')
+                sourceRecord['STATION_CALL_SIGN']=text;
+            if (currentTag == 'num')
+                sourceRecord['FCC_CHANNEL_NUM']=text;
+            if (currentTag == 'city')
+                sourceRecord['STATION_CITY']=text;
+            if (currentTag == 'state')
+                sourceRecord['STATION_STATE']=text;
+            if (currentTag == 'country')
+                sourceRecord['STATION_COUNTRY']=text;
+    // sourceRecord..push(text);
         }
         if (currentTag === "URI") {
             currentSourceImage['url'] = 'http://demo.tmsimg.com/' + text;
