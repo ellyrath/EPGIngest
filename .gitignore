@@ -11,3 +11,6 @@ xmls/
 output/
 
 *.bak
+
+# Log files
+*.log

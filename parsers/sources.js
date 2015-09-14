@@ -25,15 +25,20 @@ var sourcesParser = function (saxStream, outputDirectoryPrefix) {
         'STATION_STATE': "",
         'STATION_COUNTRY': "",
         'FCC_CHANNEL_NUM': "",
-        'sourceImageStore':{}
+        'sourceImageStore': {
+            'width': '',
+            'height': '',
+            'type': '',
+            'url': ''
+        }
     };
 
-    var sourceImageTemplate = {
-        'width': '',
-        'height': '',
-        'type': '',
-        'url': ''
-    };
+    //var sourceImageTemplate = {
+    //    'width': '',
+    //    'height': '',
+    //    'type': '',
+    //    'url': ''
+    //};
 
     var print = function(o){
         var str='';
@@ -56,8 +61,6 @@ var sourcesParser = function (saxStream, outputDirectoryPrefix) {
     }
     var sourceRecord = {};
     _.extend(sourceRecord, sourceTemplate);
-
-
 
     var validTags = ["name", "type", "timeZone", "callSign","num"];
     var fieldSeparator = "|";
@@ -102,12 +105,7 @@ var sourcesParser = function (saxStream, outputDirectoryPrefix) {
     saxStream.on("closetag", function (node) {
         if (node === 'prgSvc') {
          //   fileAppender(outputDirectoryPrefix, 'sources.txt', sourceRecord.join(fieldSeparator) + os.EOL);
-           if ( _.size(sourceRecord['sourceImageStore']) === 0)
-            {
-                _.extend(sourceImageTemplate, sourceImageMax);
-                sourceRecord['sourceImageStore'] = sourceImageTemplate;
-                sourceImageTemplate=[];
-            }
+
             fileAppender(outputDirectoryPrefix, 'sources.txt', print(sourceRecord) + os.EOL);
             sourceRecord['sourceImageStore']=[];
                 sourceRecord = [];
@@ -115,13 +113,14 @@ var sourcesParser = function (saxStream, outputDirectoryPrefix) {
             prgSvcId = "";
             sourceId = "";
             _.extend(sourceRecord, sourceTemplate);
+
         }
         if (node === 'images' && !_.isEmpty(sourceImages)) {
             //fileAppender(outputDirectoryPrefix, 'sources-images.txt', _.values(_.max(sourceImages, largestImage)).join(fieldSeparator) + os.EOL);
             //sourceRecord.push(_.values(_.max(sourceImages, largestImage)).join(fieldSeparator));
             var sourceImageMax = (_.max(sourceImages, largestImage));
-            _.extend(sourceImageTemplate,sourceImageMax) ;
-              sourceRecord['sourceImageStore']=  sourceImageTemplate ;
+            //_.extend(sourceImageTemplate,sourceImageMax) ;
+              sourceRecord['sourceImageStore']=  sourceImageMax ;
             console.log(sourceRecord['sourceImageStore']);
             sourceImages = [];
         }

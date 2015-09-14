@@ -1,13 +1,11 @@
 var os = require('os');
-var console = require('console');
 var _ = require('underscore');
+var console = require('console');
 var fileAppender = require('../utils/fileAppender');
 var fieldSeparator = "|";
-var properties = require('../utils/propertyReader');
 var mapper = require('../utils/propsMapper');
 
-
-var schedulesParser = function (saxStream, outputDirectoryPrefix) {
+var genericSchedulesParser = function (saxStream, outputDirectoryPrefix) {
     saxStream.on("error", function (e) {
         // unhandled errors will throw, since this is a proper node
         // event emitter.
@@ -16,25 +14,22 @@ var schedulesParser = function (saxStream, outputDirectoryPrefix) {
         this._parser.error = null
         this._parser.resume()
     });
-    var validTags = ["time","tvRating", "tvSubRating","quals"];
+    var validTags = ["time","duration","tvRating", "tvFlags","props"];
     var fieldSeparator = "|";
  //   var scheduleRecord = [];
     var currentTag = "";
     var prgSvcId = "";
     var sourceId = "";
-    var isTVRating = false;
-    var isMovieRating = false;
 
 
     var scheduleTemplate = {
-        'sourceId': '',
-        'prgSvcId': '',
-        'TMSId': '',
+        'ChannelId': '',
+        'InChannelId': '',
+        'ProgramId': '',
         'date': '',
         'time':'',
         'duration': '',
-        'tv_rating':'NR',
-        'movie_rating':'NR',
+        'tv_rating':'',
         'Sex_rating':'N',
         'Violence_rating':'N',
         'Language_rating':'N',
@@ -63,39 +58,25 @@ var schedulesParser = function (saxStream, outputDirectoryPrefix) {
         return str;
     }
 
-  saxStream.on("opentag", function (node) {
-        if (node.name === 'on'){
+
+    saxStream.on("opentag", function (node) {
+        if (node.name === 'generic'){
+
+
             // Write header
-            fileAppender(outputDirectoryPrefix, 'schedules.txt', printHeader(scheduleTemplate) + os.EOL);
+            fileAppender(outputDirectoryPrefix, 'generic-schedules.txt', printHeader(scheduleTemplate) + os.EOL);
                    }
         if (node.name === 'schedule') {
-            scheduleRecord['prgSvcId'] = node.attributes['prgSvcId'];
-            scheduleRecord['sourceId'] = node.attributes['sourceId'];
-            prgSvcId = node.attributes['prgSvcId'];
-            sourceId = node.attributes['sourceId'];
+            scheduleRecord['ChannelId'] = node.attributes['channelId'];
+            scheduleRecord['InChannelId'] = node.attributes['channelId'];
+            prgSvcId = node.attributes['channelId'];
+            sourceId = node.attributes['channelId'];
 
         }
         if (node.name === 'event') {
-            scheduleRecord['TMSId'] = (node.attributes['TMSId']);
+            scheduleRecord['ProgramId'] = (node.attributes['programId']);
             scheduleRecord['date'] = (node.attributes['date']);
         }
-        if (node.name === 'tv') {
-            var duration = node.attributes['dur'].replace(/[^0-9]/g, ''); //PT00H30M => 0030
-            scheduleRecord['duration'] = duration;
-            console.log ('isMovieRating', isMovieRating , 'isTVRating' , isTVRating);
-        }
-      if (node.name === 'tvRating' ) {
-
-          if (node.attributes['body'] === properties.rp("TV_RatingsBody"))
-          {
-              isTVRating = true;
-          }
-          if (node.attributes['ratingsBody'] === properties.rp("Movie_RatingsBody"))
-          {
-            isMovieRating = true;
-          }
-      }
-
 
         currentTag = node.name;
     });
@@ -112,14 +93,12 @@ var schedulesParser = function (saxStream, outputDirectoryPrefix) {
 
             //To maintain the order
             var finalScheduleRecord = [];
-            finalScheduleRecord.push(scheduleRecord['sourceId']);
-            finalScheduleRecord.push(scheduleRecord['prgSvcId']);
-            finalScheduleRecord.push(scheduleRecord['TMSId']);
-            finalScheduleRecord.push(scheduleRecord['date']);
+            finalScheduleRecord.push(scheduleRecord['ChannelId']);
+            finalScheduleRecord.push(scheduleRecord['InChannelId']);
+            finalScheduleRecord.push(scheduleRecord['ProgramId']);
             finalScheduleRecord.push(scheduleRecord['time']);
             finalScheduleRecord.push(scheduleRecord['duration']);
             finalScheduleRecord.push(scheduleRecord['tv_rating']);
-            finalScheduleRecord.push(scheduleRecord['movie_rating']);
             finalScheduleRecord.push(scheduleRecord['Sex_rating']);
             finalScheduleRecord.push(scheduleRecord['Violence_rating']);
             finalScheduleRecord.push(scheduleRecord['Language_rating']);
@@ -134,22 +113,20 @@ var schedulesParser = function (saxStream, outputDirectoryPrefix) {
 
 
         //    fileAppender(outputDirectoryPrefix, 'schedules.txt', scheduleRecord.join(fieldSeparator) + os.EOL);
-            fileAppender(outputDirectoryPrefix, 'schedules.txt', print(finalScheduleRecord) + os.EOL);
+            fileAppender(outputDirectoryPrefix, 'generic-schedules.txt', print(finalScheduleRecord) + os.EOL);
          //   fileAppender(outputDirectoryPrefix, 'schedules.txt',    _.values(scheduleRecord).join(fieldSeparator)  + os.EOL);
 
 
              scheduleRecord = {};
             _.extend(scheduleRecord, scheduleTemplate);
-            scheduleRecord['prgSvcId'] = prgSvcId;
-            scheduleRecord['sourceId'] = sourceId;
-            isTVRating = false;
-            isMovieRating = false;
+            scheduleRecord['ChannelId'] = prgSvcId;
+            scheduleRecord['InChannelId'] = sourceId;
          //   scheduleRecord = [prgSvcId, sourceId];
         }
         currentTag = "";
     });
     saxStream.on("end", function (node) {
-        console.timeEnd("schedules parsing");
+        console.timeEnd("generic");
     });
     saxStream.on("text", function (text) {
         if (validTags.indexOf(currentTag) != -1) {
@@ -158,26 +135,23 @@ var schedulesParser = function (saxStream, outputDirectoryPrefix) {
                 scheduleRecord['time'] = text;
             if (currentTag == 'duration')
                 scheduleRecord['duration'] = text;
-            if (currentTag == 'tvRating') {
+            if (currentTag == 'tvRating')
+                scheduleRecord['tv_rating'] = text;
 
-                if (isMovieRating)
-                    scheduleRecord['movie_rating'] = text;
-                if (isTVRating)
-                    scheduleRecord['tv_rating'] = text;
+            if (currentTag == 'props') {
+                    mapper.map(scheduleRecord, text);
             }
-
-            if (currentTag == 'tvSubRating') {
-                mapper.map(scheduleRecord,text);
+            if (currentTag == 'tvFlags') {
+                mapper.map(scheduleRecord, text);
             }
-
-            if (currentTag == 'quals') {
-                    mapper.map(scheduleRecord,text);
-            }
-
+              //console.log('quals', text);
+         //   var quals = text;
+          //  var splitted = text.toString().split('|');
+           // scheduleRecord.push(text);
 
         }
     });
     return saxStream;
 };
 
-module.exports = schedulesParser;
+module.exports = genericSchedulesParser;
