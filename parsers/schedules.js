@@ -16,9 +16,8 @@ var schedulesParser = function (saxStream, outputDirectoryPrefix) {
         this._parser.error = null
         this._parser.resume()
     });
-    var validTags = ["time","tvRating", "tvSubRating","quals"];
+    var validTags = ["time","tv", "tvRating", "tvSubRating","quals"];
     var fieldSeparator = "|";
- //   var scheduleRecord = [];
     var currentTag = "";
     var prgSvcId = "";
     var sourceId = "";
@@ -82,7 +81,11 @@ var schedulesParser = function (saxStream, outputDirectoryPrefix) {
         if (node.name === 'tv') {
             var duration = node.attributes['dur'].replace(/[^0-9]/g, ''); //PT00H30M => 0030
             scheduleRecord['duration'] = duration;
-            console.log ('isMovieRating', isMovieRating , 'isTVRating' , isTVRating);
+            if (scheduleRecord['TMSId']==='MV000858660000') {
+                console.log('node is TV isTVRating', isTVRating);
+                console.log('node is TV  isMovieRating', isTVRating);
+            }
+
         }
       if (node.name === 'tvRating' ) {
 
@@ -94,6 +97,7 @@ var schedulesParser = function (saxStream, outputDirectoryPrefix) {
           {
             isMovieRating = true;
           }
+
       }
 
 
@@ -112,12 +116,21 @@ var schedulesParser = function (saxStream, outputDirectoryPrefix) {
 
             //To maintain the order
             var finalScheduleRecord = [];
+
             finalScheduleRecord.push(scheduleRecord['sourceId']);
             finalScheduleRecord.push(scheduleRecord['prgSvcId']);
             finalScheduleRecord.push(scheduleRecord['TMSId']);
             finalScheduleRecord.push(scheduleRecord['date']);
             finalScheduleRecord.push(scheduleRecord['time']);
             finalScheduleRecord.push(scheduleRecord['duration']);
+
+            if (scheduleRecord['TMSId']=='MV000858660000') {
+                console.log('finalScheduleRecord scheduleRecord[date]', scheduleRecord['date']);
+                console.log('finalScheduleRecord scheduleRecord[tv_rating]', scheduleRecord['tv_rating']);
+                console.log('finalScheduleRecord scheduleRecord[movie_rating]', scheduleRecord['movie_rating']);
+            }
+
+
             finalScheduleRecord.push(scheduleRecord['tv_rating']);
             finalScheduleRecord.push(scheduleRecord['movie_rating']);
             finalScheduleRecord.push(scheduleRecord['Sex_rating']);
@@ -159,19 +172,23 @@ var schedulesParser = function (saxStream, outputDirectoryPrefix) {
             if (currentTag == 'duration')
                 scheduleRecord['duration'] = text;
             if (currentTag == 'tvRating') {
-
                 if (isMovieRating)
                     scheduleRecord['movie_rating'] = text;
                 if (isTVRating)
                     scheduleRecord['tv_rating'] = text;
             }
+            if (scheduleRecord['TMSId']=='MV000858660000') {
+                console.log('text scheduleRecord[tv_rating]', scheduleRecord['tv_rating']);
+                console.log('text scheduleRecord[movie_rating]', scheduleRecord['movie_rating']);
 
-            if (currentTag == 'tvSubRating') {
-                mapper.map(scheduleRecord,text);
+            }
+
+            if (currentTag === 'tvSubRating') {
+               mapper.map(scheduleRecord,text);
             }
 
             if (currentTag == 'quals') {
-                    mapper.map(scheduleRecord,text);
+                  mapper.map(scheduleRecord,text);
             }
 
 
