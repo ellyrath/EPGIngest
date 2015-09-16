@@ -71,6 +71,7 @@ router.get('/schedules', function (req, res, next) {
     filePurger(outputDirectoryPrefix, schedulesFilesToBeDeleted);
     console.time('schedules parsing');
     var filePath = path.join(dirString,inputDirectoryPrefix, "schedules.xml");
+    //var filePath = path.join(dirString,inputDirectoryPrefix, "schedules_sample.xml");
     //if (fs.existsSync(filePath)) {
     fs.createReadStream(filePath)
         .pipe(schedulesParser);
@@ -80,19 +81,19 @@ router.get('/schedules', function (req, res, next) {
 });
 
 
-router.get('/generic-schedules', function (req, res, next) {
-    //Remove any existing files
-    filePurger(outputDirectoryPrefix, schedulesFilesToBeDeleted);
-    console.time('generic');
-    var filePath = path.join(dirString,inputDirectoryPrefix, "generic-schedules.xml");
-    console.log('directory to start walking...', filePath);
-    //if (fs.existsSync(filePath)) {
-    fs.createReadStream(filePath)
-        .pipe(genericSchedulesParser);
-    //}
-    res.render('generic-schedules', {title: "Parsing the Generic Schedules XML"});
-
-});
+//router.get('/generic-schedules', function (req, res, next) {
+//    //Remove any existing files
+//    filePurger(outputDirectoryPrefix, schedulesFilesToBeDeleted);
+//    console.time('generic');
+//    var filePath = path.join(dirString,inputDirectoryPrefix, "generic-schedules.xml");
+//    console.log('directory to start walking...', filePath);
+//    //if (fs.existsSync(filePath)) {
+//    fs.createReadStream(filePath)
+//        .pipe(genericSchedulesParser);
+//    //}
+//    res.render('generic-schedules', {title: "Parsing the Generic Schedules XML"});
+//
+//});
 
 router.get('/files', function (req, res, next) {
     fs.createReadStream(path.join(outputDirectoryPrefix, "programs.txt")).pipe(res);
