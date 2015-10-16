@@ -110,7 +110,8 @@ var schedulesParser = function (saxStream, outputDirectoryPrefix) {
         if (node === 'schedule') {
             prgSvcId = "";
             sourceId = "";
-            scheduleRecord = [];
+            scheduleRecord = {};
+            _.extend(scheduleRecord, scheduleTemplate);
         }
         if (node === 'event') {
 

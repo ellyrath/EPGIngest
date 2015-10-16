@@ -10,7 +10,12 @@ xmls/
 # Output folder
 output/
 
+# Downloads folder
+downloads/
+
 *.bak
 
 # Log files
 *.log
+/**/*.xml
+/**/*.xml.gz
