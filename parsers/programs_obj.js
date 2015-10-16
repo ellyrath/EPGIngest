@@ -22,7 +22,7 @@ var programsParser = function (saxStream, outputDirectoryPrefix, io) {
         }
         return str;
     }
-    var validRecordTags = ["progType", "synNum", "origAirDate"];
+    var validRecordTags = ["synNum", "origAirDate"];
     var validCastTags = ["characterName", "role", "first", "last"];
     var validImageTags = ["URI"];
     var fieldSeparator = "|";
@@ -42,7 +42,8 @@ var programsParser = function (saxStream, outputDirectoryPrefix, io) {
         'origAirDate': '',
         'seasonNum':'',
         'episodeNum':'',
-        'episodeTitle':''
+        'episodeTitle':'',
+        'SeriesDesc': ''
     };
     var programRecord = {};
     _.extend(programRecord, programRecordTemplate);
@@ -62,9 +63,13 @@ var programsParser = function (saxStream, outputDirectoryPrefix, io) {
     var imageRecord = null;
     var currentTag = "";
     var tmsId = "";
+    var connectorId = "";
+    var seasonId = "";
     var seriesId = "";
     var hasTitleBeenPushed = false;
+    var hasProgTypeBeenPushed = false;
     var hasDescBeenPushed = true;
+    var hasSeriesDescBeenPushed = true;
     var hasTVRatingBeenPushed = false;
     var hasMovieRatingBeenPushed = false;
     var isEpisode = false;
@@ -98,9 +103,11 @@ var programsParser = function (saxStream, outputDirectoryPrefix, io) {
     var cleanUp = function (item) {
         return item && item.indexOf('\n') == -1 && item.indexOf('\r') == -1 && item.indexOf('\t') == -1
     };
-    var getProgramImage = function (TMSId, width, height, type, url, tier, category, orientation) {
+    var getProgramImage = function (TMSId, connectorId, seasonId, width, height, type, url, tier, category, orientation) {
         return {
             'sourceId': TMSId,
+            'connectorId': connectorId,
+            'seasonId': seasonId,
             'width': width,
             'height': height,
             'type': type,
@@ -426,25 +433,36 @@ var programsParser = function (saxStream, outputDirectoryPrefix, io) {
            // fileAppender(outputDirectoryPrefix, 'programs.txt', printHeader(programRecordTemplate) + os.EOL);
             fileAppender(outputDirectoryPrefix, 'programs.txt', printer.printHeader(programRecordTemplate) + os.EOL);
             fileAppender(outputDirectoryPrefix, 'programs-cast.txt',printHeader(programCastTemplate) + os.EOL);
+            fileAppender(outputDirectoryPrefix, 'programs-image.txt',printHeader(new getProgramImage(tmsId, connectorId, seasonId,  'width', 'height', 'type', null, 'tier', 'category')) + 'orientation|' + 'position' + os.EOL);
+
         }
 
         if (node.name === 'program') {
-            var title = node.attributes['TMSId'];
-            programRecord['TMSId'] = title;
-            programCast['TMSId'] =title;
-            console.log("title" + title);
-            if (title.indexOf("MV") === 0)
+            var programId = node.attributes['TMSId'];
+            connectorId = node.attributes['connectorId'];
+            seriesId = node.attributes['seriesId'];
+            seasonId = node.attributes['seasonId'];
+            programRecord['TMSId'] = programId;
+            programCast['TMSId'] =programId;
+            console.log("programId" + programId);
+            if (programId.indexOf("MV") === 0)
             {
                 isMovie = true;
             }
-            programRecord['connectorId'] = node.attributes['connectorId'];
+            programRecord['connectorId'] = connectorId;
             programRecord['rootId'] = node.attributes['rootId'];
-            programRecord['seasonId'] = node.attributes['seasonId'];
-            programRecord['seriesId'] = node.attributes['seriesId'];
+            programRecord['seasonId'] = seasonId;
+            programRecord['seriesId'] = seriesId;
+            if (programId === connectorId && !isMovie)
+            {
+                programRecord['progType'] = 'SM';
+                hasProgTypeBeenPushed = true;
+            }
             tmsId = node.attributes['TMSId'];
-            seriesId = node.attributes['seriesId'];
+
             hasTitleBeenPushed = false;
             hasDescBeenPushed = true;
+            hasSeriesDescBeenPushed = true;
             programCount++;
             verticalImages = [];
             horizontalImages = [];
@@ -454,8 +472,11 @@ var programsParser = function (saxStream, outputDirectoryPrefix, io) {
             programRecord['episodeNum'] = node.attributes['number'];
             isEpisode = true;
        }
-      if (node.name === 'desc' && node.attributes['size'] === '100') {
+        if (node.name === 'desc' && node.attributes['size'] === '100' && node.attributes['type'] === 'plot') {
             hasDescBeenPushed = false;
+        }
+        if (node.name === 'desc' && node.attributes['size'] === '1000' && node.attributes['type'] === 'Series Summary') {
+            hasSeriesDescBeenPushed= false;
         }
         if (node.name === 'rating' && ( !hasMovieRatingBeenPushed || !hasTVRatingBeenPushed) ) {
 
@@ -473,6 +494,7 @@ var programsParser = function (saxStream, outputDirectoryPrefix, io) {
         if (node.name === 'cast') {
             isCast = true;
         }
+
         if (isCast && node.name === 'member') {
             programCast['personId'] = node.attributes['personId'];
             programCast['ord'] = node.attributes['ord'];
@@ -485,7 +507,8 @@ var programsParser = function (saxStream, outputDirectoryPrefix, io) {
 
 
         if (node.name === 'asset' && node.attributes['type'].indexOf('image') != -1 && node.attributes['action'] !== 'delete' && node.attributes['primary'] ==='true' ) {
-            imageRecord = new getProgramImage(tmsId, node.attributes['width'], node.attributes['height'], node.attributes['type'].replace(/image\//g, ''), null, node.attributes['tier'], node.attributes['category']);
+            console.log("tmsId" + tmsId + "connectorId" + connectorId + "seasonId" + seasonId);
+            imageRecord = new getProgramImage(tmsId, connectorId, seasonId,  node.attributes['width'], node.attributes['height'], node.attributes['type'].replace(/image\//g, ''), null, node.attributes['tier'], node.attributes['category']);
         }
         currentTag = node.name;
     });
@@ -512,6 +535,7 @@ var programsParser = function (saxStream, outputDirectoryPrefix, io) {
             finalProgramRecord.push(programRecord['seasonNum']);
             finalProgramRecord.push(programRecord['episodeNum']);
             finalProgramRecord.push(programRecord['episodeTitle']);
+            finalProgramRecord.push(programRecord['SeriesDesc']);
 
 
 
@@ -522,14 +546,21 @@ var programsParser = function (saxStream, outputDirectoryPrefix, io) {
             programRecord['genre'] = [];
             _.extend(programCast, programCastTemplate);
             tmsId = "";
+            connectorId="";
             seriesId = "";
+            seasonId = "";
+            hasProgTypeBeenPushed = false;
+
         }
         if (node === 'title') {
             hasTitleBeenPushed = true;
         }
         if (node === 'desc') {
             hasDescBeenPushed = true;
+            hasSeriesDescBeenPushed = true;
         }
+
+
         if (node === 'episodeInfo') {
             isEpisode = false;
         }
@@ -598,10 +629,21 @@ var programsParser = function (saxStream, outputDirectoryPrefix, io) {
             programRecord['title'] = this._parser.textNode;
         } else if (this._parser.tagName === 'desc' && !hasDescBeenPushed) {
             programRecord['desc'] = this._parser.textNode;
+        }else if (this._parser.tagName === 'desc' && !hasSeriesDescBeenPushed) {
+                programRecord['SeriesDesc'] = this._parser.textNode;
         } else if (this._parser.tagName === 'genre') {
             programRecord['genre'].push(this._parser.textNode);
         } else if (this._parser.tagName === 'title' && isEpisode) {
             programRecord['episodeTitle'] = this._parser.textNode;
+        }
+        else if (this._parser.tagName === 'progType' && !hasProgTypeBeenPushed) {
+            var program_type = this._parser.textNode;
+            if ( program_type.toLowerCase() === 'series')
+                programRecord['progType'] = 'SE';
+            else if (isMovie)
+                programRecord['progType'] = 'MO';
+            else
+            programRecord['progType'] = 'OT';
         }
 
 
@@ -618,6 +660,14 @@ var programsParser = function (saxStream, outputDirectoryPrefix, io) {
             if (!imageRecord) {
                 return;
             }
+
+            console.log("url_suffix_present" + properties.rp("url_suffix_present"));
+            //if (properties.rp("url_suffix_present").toLowerCase() === "yes")
+            //{
+            //    console.log("url_suffix" + properties.rp("url_suffix"));
+            // var suffix = properties.rp("url_suffix");
+            //
+            //}
             imageRecord['url'] = 'http://demo.tmsimg.com/' + text;
             programImages.push(imageRecord);
             imageRecord = null;
